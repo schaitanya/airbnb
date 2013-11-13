@@ -8,6 +8,7 @@ _       = require 'underscore'
 mongo = mongojs "mongodb://127.0.0.1:27017/airbnb", ['properties']
 
 mongo.properties.ensureIndex { available_dates: 1 }
+mongo.properties.ensureIndex { location: 1 }
 BASE_URL = "https://www.airbnb.com/search/ajax_get_results"
 
 app = express()
@@ -25,7 +26,7 @@ template = (body) ->'
     <link href="//www.eyecon.ro/bootstrap-datepicker/css/datepicker.css" rel="stylesheet">
   </head>
 
-  <body>
+  <body style="margin-top:50px;">
     <div class="container">
       <form class="form-horizontal" method="post">
         <div class="form-group">
@@ -67,16 +68,9 @@ template = (body) ->'
 </html>
 '
 
-templ = """
-  {% if date in b.available_dates %}
-    <td> </td>
-  {% else %}
-    <td> X </td>
-  {% endif %}
-"""
 
 __buildTable = (body, dates, cb) ->
-  return cb __baseHtml "No available properties found!" if _.isNull body
+  return cb __baseHtml "No available properties found!" if _.isNull(body) or _.isEmpty(body)
   tr = []
   th = ''
   atLeastOne = {}
@@ -96,7 +90,7 @@ __buildTable = (body, dates, cb) ->
       tr +="<tr><td>#{b.name}</td>#{td}</tr>"
       callback()
   , (err) ->
-    return cb __baseHtml "<table class='table'><tr><th></th>#{th}</tr>#{tr}</table>"
+    return cb __baseHtml "<table class='table table-bordered'><tr><th></th>#{th}</tr>#{tr}</table>"
 
 __baseHtml = (body) ->
   """
@@ -107,7 +101,7 @@ __baseHtml = (body) ->
     <link href="//www.eyecon.ro/bootstrap-datepicker/css/datepicker.css" rel="stylesheet">
   </head>
 
-  <body>
+  <body style="margin-top:50px;">
     <div class="container">
       #{body}
     </div>
@@ -145,7 +139,7 @@ app.post '/', (req, res) ->
 
   dates = [from]
   async.whilst ->
-    return end > start
+    return end >= start
   , (callback) ->
     startDate = _.clone from
     y = if i is 0 then i else 1
@@ -162,18 +156,15 @@ app.post '/', (req, res) ->
         checkout : endDate
       json: true
     request opts, (e, r, body) ->
-      __processData body, location, startDate, (e, d) ->
-        callback()
+      __processData body, location, startDate, callback
 
-  ,(err) ->
+  , (err) ->
     if only
-      console.log dates
       mongo.properties.find { location: location, available_dates: { $all: dates } }, (err, data) ->
         __buildTable data, dates, (dt) ->
           return res.send dt
     else
       mongo.properties.find { location: location }, (err, data) ->
-
         __buildTable data, dates, (dt) ->
           return res.send dt
 

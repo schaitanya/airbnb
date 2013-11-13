@@ -72,25 +72,22 @@ template = (body) ->'
 </html>
 '
 
-__buildTable = (body, dates) ->
-
+__buildTable = (body, dates, cb) ->
+  tr = []
   th = []
-
-  tr = "<tr>#{th}</tr>"
-  for prop in body
-    "<tr><td>Name</td><td></tr>"
-
+  async.each body, (b, callback) ->
     td = []
     for date in dates
       th.push "<th>#{date}</th>"
-      if date in prop.available_dates
-        td.push "<td> </td>"
+      if date in b.available_dates
+        td.push "<td>-</td>"
       else
         td.push "<td>X</td>"
-    td = "<tr><td>#{prop.name}</td>#{td}</tr>"
-
-  return __baseHtml "<table class='table'><tr><th></th>#{th}</tr><tr>#{td}</tr></table>"
-
+    tr.push  "<tr><td>#{b.name}</td>#{td}</tr>"
+    callback()
+  , (err) ->
+    console.log __baseHtml "<table class='table'><tr><th></th>#{th}</tr>#{tr}</table>"
+    return cb __baseHtml "<table class='table'><tr><th></th>#{th}</tr>#{tr}</table>"
 
 __baseHtml = (body) ->
   """
@@ -161,6 +158,7 @@ app.post '/', (req, res) ->
 
   ,(err) ->
     mongo.properties.find { location: location }, (err, data) ->
-      res.send __buildTable data, dates
+      __buildTable data, dates, (dt) ->
+        res.send dt
 
 app.listen 8080

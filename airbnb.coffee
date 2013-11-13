@@ -1,20 +1,14 @@
 request = require 'request'
-
-BASE_URL = "https://www.airbnb.com/search/ajax_get_results"
-
-# ?search_view=1&min_bedrooms=0&min_bathrooms=0&min_beds=0&page=1&location=Raleign%2C+NC&checkin=05%2F01%2F2013&checkout=05%2F12%2F2013&guests=1&sort=0&keywords=&price_min=&price_max=&per_page=21
-
 express = require 'express'
-
 mongojs = require 'mongojs'
+moment  = require 'moment'
+async   = require 'async'
+_       = require 'underscore'
 
 mongo = mongojs "mongodb://127.0.0.1:27017/airbnb", ['properties']
 
 mongo.properties.ensureIndex { available_dates: 1 }
-
-moment = require 'moment'
-async = require 'async'
-_ = require 'underscore'
+BASE_URL = "https://www.airbnb.com/search/ajax_get_results"
 
 app = express()
 app.use express.bodyParser()
@@ -82,16 +76,19 @@ templ = """
 """
 
 __buildTable = (body, dates, cb) ->
+  return cb __baseHtml "No available properties found!" if _.isNull body
   tr = []
   th = ''
+  atLeastOne = {}
   async.each body, (b, callback) ->
     td = ""
     th = ''
     async.each dates, (date, cb) ->
       th += "<th>#{date}</th>"
       if date in b.available_dates
-        td += "<td>-</td>"
+        td += "<td> </td>"
       else
+
         td += "<td>X</td>"
 
       cb()
@@ -137,6 +134,7 @@ app.post '/', (req, res) ->
   location = req.body.location
   from     = req.body.from
   to       = req.body.to
+  only = req.body.onlyavailable is 'on'
 
   start = moment(from).date()
   end = moment(to).date()
@@ -152,7 +150,7 @@ app.post '/', (req, res) ->
     startDate = _.clone from
     y = if i is 0 then i else 1
     endDate = moment(startDate, 'MM-DD-YYYY').add('days', y).format('MM-DD-YYYY')
-    dates.push endDate
+    dates.push endDate if i isnt 0
     from = endDate
     start++
     i++
@@ -168,8 +166,15 @@ app.post '/', (req, res) ->
         callback()
 
   ,(err) ->
-    mongo.properties.find { location: location }, (err, data) ->
-      __buildTable data, dates, (dt) ->
-        res.send dt
+    if only
+      console.log dates
+      mongo.properties.find { location: location, available_dates: { $all: dates } }, (err, data) ->
+        __buildTable data, dates, (dt) ->
+          return res.send dt
+    else
+      mongo.properties.find { location: location }, (err, data) ->
+
+        __buildTable data, dates, (dt) ->
+          return res.send dt
 
 app.listen 8080

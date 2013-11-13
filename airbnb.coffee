@@ -84,19 +84,19 @@ templ = """
 __buildTable = (body, dates, cb) ->
   tr = []
   th = ''
-
-
   async.each body, (b, callback) ->
     td = ""
+    th = ''
     async.each dates, (date, cb) ->
       th += "<th>#{date}</th>"
       if date in b.available_dates
         td += "<td>-</td>"
       else
         td += "<td>X</td>"
-      tr +="<tr><td>#{b.name}</td>#{td}</tr>"
+
       cb()
     ,(err) ->
+      tr +="<tr><td>#{b.name}</td>#{td}</tr>"
       callback()
   , (err) ->
     return cb __baseHtml "<table class='table'><tr><th></th>#{th}</tr>#{tr}</table>"
@@ -120,7 +120,6 @@ __baseHtml = (body) ->
 """
 
 __processData = (body, location, from, cb) ->
-  console.log 'body'
   properties = body?.properties
   props = {}
   # mongo.properties.insert properties, cb
@@ -146,14 +145,14 @@ app.post '/', (req, res) ->
 
   i = 0
 
-  dates = []
+  dates = [from]
   async.whilst ->
     return end > start
   , (callback) ->
-    dates.push from
-    startDate = from
+    startDate = _.clone from
     y = if i is 0 then i else 1
     endDate = moment(startDate, 'MM-DD-YYYY').add('days', y).format('MM-DD-YYYY')
+    dates.push endDate
     from = endDate
     start++
     i++

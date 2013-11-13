@@ -14,6 +14,7 @@ mongo.properties.ensureIndex { available_dates: 1 }
 
 moment = require 'moment'
 async = require 'async'
+_ = require 'underscore'
 
 app = express()
 app.use express.bodyParser()
@@ -72,21 +73,32 @@ template = (body) ->'
 </html>
 '
 
+templ = """
+  {% if date in b.available_dates %}
+    <td> </td>
+  {% else %}
+    <td> X </td>
+  {% endif %}
+"""
+
 __buildTable = (body, dates, cb) ->
   tr = []
-  th = []
+  th = ''
+
+
   async.each body, (b, callback) ->
-    td = []
-    for date in dates
-      th.push "<th>#{date}</th>"
+    td = ""
+    async.each dates, (date, cb) ->
+      th += "<th>#{date}</th>"
       if date in b.available_dates
-        td.push "<td>-</td>"
+        td += "<td>-</td>"
       else
-        td.push "<td>X</td>"
-    tr.push  "<tr><td>#{b.name}</td>#{td}</tr>"
-    callback()
+        td += "<td>X</td>"
+      tr +="<tr><td>#{b.name}</td>#{td}</tr>"
+      cb()
+    ,(err) ->
+      callback()
   , (err) ->
-    console.log __baseHtml "<table class='table'><tr><th></th>#{th}</tr>#{tr}</table>"
     return cb __baseHtml "<table class='table'><tr><th></th>#{th}</tr>#{tr}</table>"
 
 __baseHtml = (body) ->
